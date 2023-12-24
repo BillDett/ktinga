@@ -1,65 +1,43 @@
 // K'Tinga Lighting - ATTiny85 Pinout
 
 /*
- * Strobe lights
- * Flickering engine lights (0..255)
+ * Button-activated torpedo
+ * Using https://github.com/jgillick/arduino-LEDFader
  */
 
-int seedPIN = 2;  //Not connected
-int strobeLED1 = 3;
-int strobeLED2 = 4;
-unsigned long strobeStart;
-unsigned long strobeEnd;
-long strobeOn = 0.15 * 1000;
-long strobeOff = 2.15 * 1000;
-int strobeValue = HIGH;
+#include <ButtonDebounce.h>
+#include <LEDFader.h>
 
-int engineLED1 = 0;
-int engineLED2 = 1;
-int baseEngineLevel = 100;
-int maxEngineLevel = 255; 
-int engineDelay = 1 * 1000;
-unsigned long engineStart;
-unsigned long engineEnd;
+// Button on pin 2, torpedo LED on pin 0
+ButtonDebounce button(2, 250);
+LEDFader torpedo; 
+
+int max_fade = 100;
+bool launch = false;
 
 void setup() {
-    randomSeed(analogRead(seedPIN));  // Picks up random cosmic rays to seed random()
-    strobeStart = millis();
-    strobeEnd = strobeStart + strobeOn;
-    engineStart = millis();
-    engineEnd = engineStart + engineDelay;
-    pinMode(strobeLED1, OUTPUT);
-    pinMode(strobeLED2, OUTPUT);
-    pinMode(engineLED1, OUTPUT);
-    pinMode(engineLED2, OUTPUT);
 }
 
 void loop() {
+ 
+  button.update();
 
-  unsigned long now = millis();
-   
-   // Blink the Strobe Lights
-  if ( now < strobeEnd ) {
-    digitalWrite(strobeLED1, strobeValue);   
-    digitalWrite(strobeLED2, strobeValue);   
-  } else {
-    strobeStart = millis();
-    if ( strobeValue == HIGH ) {
-      strobeEnd = strobeStart + strobeOff;
-      strobeValue = LOW;
-    } else {
-      strobeValue = HIGH;
-      strobeEnd = strobeStart + strobeOn;
+  // Make sure that multiple button presses don't mess us up
+  if (button.state() == LOW) { // pressed
+    if (!launch) {
+      torpedo = LEDFader(0);
+      launch = true;
+      torpedo.fade(max_fade, 2000);  // Ramp up
     }
   }
 
-  // Flicker the engines
-  if (now > engineEnd ) {
-    int val = random(baseEngineLevel, maxEngineLevel);
-    analogWrite(engineLED1, val);
-    analogWrite(engineLED2, val);
-    engineEnd = now + random(engineDelay*.7, engineDelay);
-  } 
-
-  
+  if (launch) {
+    torpedo.update();
+    if (torpedo.get_value() == max_fade) {
+      torpedo.set_value(255); //Flash
+      delay(250);
+      torpedo.set_value(0);
+      launch = false;
+    }
+  }
 }
